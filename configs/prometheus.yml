@@ -1,0 +1,24 @@
+# configs/prometheus.yml
+# Run Prometheus with: prometheus --config.file=configs/prometheus.yml
+
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: sdn_dashboard
+    static_configs:
+      - targets: ["localhost:5000"]
+    metrics_path: /metrics
+
+  - job_name: sdn_ctrl_01
+    static_configs:
+      - targets: ["localhost:8001"]
+
+  - job_name: sdn_ctrl_02
+    static_configs:
+      - targets: ["localhost:8002"]
+
+  - job_name: sdn_ctrl_03
+    static_configs:
+      - targets: ["localhost:8003"]

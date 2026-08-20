@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdn-integrity-monitor"
+version = "1.0.0"
+description = "Decentralized SDN controller integrity monitoring with SHA3-256 hash chaining, ECDSA P-256 signatures, and P2P gossip consensus."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Jeevan Bennur" }]
+keywords = ["sdn", "security", "openflow", "ryu", "integrity", "blockchain", "mininet"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Security",
+    "Topic :: System :: Networking",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest >= 7.0",
+    "cryptography >= 41.0",
+    "requests >= 2.31",
+]
+runtime = [
+    "flask >= 2.3",
+    "flask-socketio >= 5.3",
+    "flask-cors >= 4.0",
+    "cryptography >= 41.0",
+    "requests >= 2.31",
+    "prometheus-client >= 0.17",
+    "eventlet >= 0.33",
+    "ryu == 4.34",
+]
+
+[tool.setuptools]
+packages = [
+    "attacks",
+    "controller",
+    "dashboard",
+    "gossip",
+    "integrity",
+    "monitoring",
+    "shared",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"

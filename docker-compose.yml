@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  dashboard:
+    build: .
+    container_name: sdn_dashboard
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./keys:/app/keys
+      - ./logs:/app/logs
+      - /tmp/sdn_state.json:/tmp/sdn_state.json
+      - /tmp/sdn_alerts.json:/tmp/sdn_alerts.json
+    command: python3 dashboard/app.py
+    restart: unless-stopped
+
+  ctrl_01:
+    build: .
+    container_name: sdn_ctrl_01
+    network_mode: host
+    environment:
+      - CONTROLLER_ID=ctrl_01
+    volumes:
+      - ./keys:/app/keys
+      - ./logs:/app/logs
+    command: >
+      sh -c "ryu-manager controller/ryu_controller.py --verbose"
+    depends_on:
+      - dashboard
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sdn_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sdn_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=sdn2026
+    depends_on:
+      - prometheus

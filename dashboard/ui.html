@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SDN Integrity Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root{
+  --bg:#070b10;--surface:#0d1520;--card:#111c27;--border:#1a2d3d;
+  --dim:#273d52;--muted:#3d6080;--text:#7aaccc;--bright:#c8e8f8;
+  --cyan:#00e5f5;--green:#00e87a;--red:#ff2255;--amber:#ffb020;--blue:#4090ff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;
+     font-size:14px;line-height:1.5;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,229,245,.018) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,229,245,.018) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0}
+
+/* ── Layout ───────────────────────────────────── */
+.app{position:relative;z-index:1;display:grid;
+     grid-template-rows:54px auto 1fr auto;height:100vh;overflow:hidden}
+
+/* ── Header ───────────────────────────────────── */
+header{display:flex;align-items:center;gap:16px;
+       padding:0 22px;background:var(--surface);
+       border-bottom:1px solid var(--border);
+       box-shadow:0 2px 24px rgba(0,0,0,.5)}
+.logo-hex{width:34px;height:34px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--cyan),var(--blue));
+  clip-path:polygon(50% 0%,95% 25%,95% 75%,50% 100%,5% 75%,5% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo h1{font-size:1.1rem;font-weight:700;letter-spacing:3px;
+         color:var(--bright);text-transform:uppercase}
+.logo p{font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;
+        font-family:'Share Tech Mono',monospace}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:20px}
+.live{display:flex;align-items:center;gap:6px;font-size:10px;
+      letter-spacing:2px;color:var(--green);text-transform:uppercase}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);
+     animation:pulse 1.4s ease infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,232,122,.5)}
+                 50%{box-shadow:0 0 0 7px rgba(0,232,122,0)}}
+.clock{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--muted)}
+#wsTag{font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px;
+       background:rgba(0,232,122,.12);color:var(--green);border:1px solid rgba(0,232,122,.25)}
+
+/* ── Alert banner ─────────────────────────────── */
+#banner{display:none;align-items:center;gap:12px;padding:9px 22px;
+        background:rgba(255,34,85,.07);border-bottom:2px solid var(--red)}
+#banner.on{display:flex}
+#banner .bi{font-size:18px}
+#banner .bt{font-size:12px;color:var(--red);flex:1;font-weight:600;letter-spacing:.5px}
+#banner .bx{font-size:10px;color:var(--muted);cursor:pointer;padding:2px 8px;
+            border:1px solid var(--dim);border-radius:2px}
+#banner .bx:hover{color:var(--bright)}
+
+/* ── Main 2-column grid ───────────────────────── */
+main{display:grid;grid-template-columns:1fr 340px;
+     gap:1px;background:var(--border);overflow:hidden}
+
+/* ── Panels ───────────────────────────────────── */
+.pn{background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+.ph{display:flex;align-items:center;gap:8px;padding:11px 16px;
+    border-bottom:1px solid var(--border);flex-shrink:0;
+    font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
+.ph-d{width:5px;height:5px;border-radius:50%;background:var(--cyan);flex-shrink:0}
+.ph-d.g{background:var(--green)}.ph-d.r{background:var(--red)}
+.ph-r{margin-left:auto;font-size:9px;letter-spacing:1px}
+
+/* ── Controller table ─────────────────────────── */
+.tbl-wrap{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--dim) transparent}
+table{width:100%;border-collapse:collapse}
+th{padding:9px 14px;text-align:left;font-size:8px;letter-spacing:2px;
+   text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);
+   font-family:'Rajdhani',sans-serif;font-weight:700;white-space:nowrap}
+td{padding:13px 14px;border-bottom:1px solid rgba(26,45,61,.5);
+   font-size:12px;vertical-align:middle;transition:background .2s}
+tr:hover td{background:rgba(0,229,245,.02)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 10px 2px 8px;
+      border-radius:20px;font-size:9px;font-weight:700;letter-spacing:1px;
+      text-transform:uppercase;font-family:'Share Tech Mono',monospace}
+.p-ok{background:rgba(0,232,122,.1);color:var(--green);border:1px solid rgba(0,232,122,.22)}
+.p-bad{background:rgba(255,34,85,.1);color:var(--red);border:1px solid rgba(255,34,85,.22);
+       animation:fp .8s ease infinite}
+.p-wait{background:rgba(255,176,32,.1);color:var(--amber);border:1px solid rgba(255,176,32,.22)}
+@keyframes fp{0%,100%{opacity:1}50%{opacity:.45}}
+.mono{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan)}
+.dim{color:var(--muted)}
+
+/* ── Alert list ───────────────────────────────── */
+.alert-pn{overflow:hidden}
+.alert-body{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--dim) transparent}
+.ai{padding:9px 14px;border-bottom:1px solid rgba(26,45,61,.5);
+    display:flex;gap:8px;align-items:flex-start;animation:sl .3s ease}
+@keyframes sl{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}
+.a-sev{font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;
+       flex-shrink:0;font-family:'Rajdhani',sans-serif;text-transform:uppercase;margin-top:1px}
+.sev-h{background:rgba(255,34,85,.18);color:var(--red)}
+.sev-m{background:rgba(255,176,32,.18);color:var(--amber)}
+.a-type{font-size:11px;font-weight:700;color:var(--bright);
+        font-family:'Rajdhani',sans-serif;letter-spacing:.5px}
+.a-det{font-size:9px;color:var(--muted);margin-top:2px;
+       font-family:'Share Tech Mono',monospace;word-break:break-all}
+.a-ts{font-size:8px;color:var(--dim);margin-top:2px}
+.no-alert{padding:20px 14px;text-align:center;color:var(--dim);font-size:11px}
+
+/* ── Topology overlay ─────────────────────────── */
+.topo-pn{position:fixed;bottom:50px;right:16px;width:310px;height:200px;
+         background:rgba(13,21,32,.92);border:1px solid var(--border);
+         border-radius:6px;z-index:200;backdrop-filter:blur(8px)}
+.topo-ph{font-size:9px;letter-spacing:2px;text-transform:uppercase;
+         color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border)}
+.topo-svg{width:100%;height:calc(100% - 30px)}
+
+/* ── Footer ───────────────────────────────────── */
+footer{background:var(--surface);border-top:1px solid var(--border);
+       padding:6px 22px;display:flex;justify-content:space-between;
+       font-size:9px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;
+       flex-shrink:0;align-items:center}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div class="logo-hex">🔐</div>
+  <div class="logo">
+    <h1>SDN Integrity Monitor</h1>
+    <p>Decentralized · Real-Time · Cryptographic Verification</p>
+  </div>
+  <div class="hdr-right">
+    <span id="wsTag">⚡ WS: connecting</span>
+    <div class="live"><div class="dot"></div>Live</div>
+    <div class="clock" id="clk">--:--:--</div>
+  </div>
+</header>
+
+<div id="banner">
+  <div class="bi">⚠</div>
+  <div class="bt" id="bannerTxt">Integrity violation detected</div>
+  <div class="bx" onclick="this.closest('#banner').classList.remove('on')">DISMISS ✕</div>
+</div>
+
+<main>
+
+  <div class="pn">
+    <div class="ph">
+      <div class="ph-d"></div>Controller Health Status
+      <span class="ph-r" id="consensusTxt">Consensus: —</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Controller</th><th>Status</th><th>SHA3-256 Chain Head</th>
+          <th>Block #</th><th>Switches</th><th>Alerts</th>
+        </tr></thead>
+        <tbody id="ctrlBody">
+          <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:28px;
+            font-family:'Share Tech Mono',monospace">Waiting for controllers...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pn alert-pn">
+    <div class="ph">
+      <div class="ph-d r"></div>Alert History
+      <span class="ph-r" id="alertCnt">0 alerts</span>
+    </div>
+    <div class="alert-body" id="alertBody">
+      <div class="no-alert">No alerts — system healthy ✓</div>
+    </div>
+  </div>
+
+</main>
+
+<div class="topo-pn">
+  <div class="topo-ph">Network Topology — 3 controllers · tree(depth=2, fanout=3)</div>
+  <svg class="topo-svg" id="topoSvg" viewBox="0 0 310 170"></svg>
+</div>
+
+<footer>
+  <span>KLE Technological University · CSE VI Sem · Minor Project 2026</span>
+  <span id="footerWs">WS: connecting...</span>
+  <span>ECDSA P-256 · SHA3-256 · Gossip Consensus</span>
+</footer>
+</div>
+
+<script>
+// ── Clock ──────────────────────────────────────────────────────────────
+setInterval(()=>document.getElementById("clk").textContent=new Date().toLocaleTimeString(),1000);
+
+// ── Socket.IO ──────────────────────────────────────────────────────────
+const io = window.io({transports:["websocket","polling"]});
+let totalAlerts = 0;
+
+io.on("connect",()=>{
+  document.getElementById("wsTag").textContent="⚡ WS: connected";
+  document.getElementById("wsTag").style.color="var(--green)";
+  document.getElementById("footerWs").textContent="WebSocket: connected";
+});
+io.on("disconnect",()=>{
+  document.getElementById("wsTag").textContent="⚡ WS: offline";
+  document.getElementById("wsTag").style.color="var(--red)";
+});
+
+// ── State update ───────────────────────────────────────────────────────
+io.on("state", state=>{
+  renderTable(state);
+  renderTopo(state);
+});
+
+// ── Alert ──────────────────────────────────────────────────────────────
+io.on("alert", a=>{
+  totalAlerts++;
+  const banner=document.getElementById("banner");
+  document.getElementById("bannerTxt").textContent=
+    `[${a.type}] ${a.source}: ${(a.detail||"").substring(0,120)}`;
+  banner.classList.add("on");
+  document.getElementById("alertCnt").textContent=totalAlerts+" alert"+(totalAlerts>1?"s":"");
+
+  const body=document.getElementById("alertBody");
+  const no=body.querySelector(".no-alert");
+  if(no) no.remove();
+  const hi=a.sev==="HIGH";
+  const el=document.createElement("div");
+  el.className="ai";
+  el.innerHTML=`
+    <div class="a-sev ${hi?"sev-h":"sev-m"}">${a.sev||"MED"}</div>
+    <div>
+      <div class="a-type">${a.type||"ALERT"}</div>
+      <div class="a-det">${(a.detail||"").substring(0,140)}</div>
+      <div class="a-ts">${fmt(a.ts)} · src: ${a.source||"?"}</div>
+    </div>`;
+  body.insertBefore(el,body.firstChild);
+  while(body.children.length>50) body.removeChild(body.lastChild);
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function fmt(ts){
+  return new Date(ts*1000).toLocaleTimeString("en-GB",
+    {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+// ── Controller table ───────────────────────────────────────────────────
+function renderTable(state){
+  if(!state||!Object.keys(state).length) return;
+  const tbody=document.getElementById("ctrlBody");
+  let allOk=true;
+  tbody.innerHTML=Object.entries(state).map(([id,c])=>{
+    if(!c.healthy) allOk=false;
+    const hash=c.hash&&c.hash!=="0".repeat(64)
+      ?`<span class="mono">${c.hash.substring(0,18)}…</span>`
+      :`<span class="dim">GENESIS</span>`;
+    const pill=c.healthy
+      ?`<span class="pill p-ok">● OK</span>`
+      :`<span class="pill p-bad">⚠ COMPROMISED</span>`;
+    return `<tr>
+      <td style="color:var(--cyan);font-family:'Share Tech Mono',monospace;font-weight:600">${id}</td>
+      <td>${pill}</td><td>${hash}</td>
+      <td class="dim mono">${c.idx||0}</td>
+      <td>${c.switches||0}</td>
+      <td style="color:${(c.alerts||0)>0?"var(--red)":"var(--muted)"};font-weight:700">${c.alerts||0}</td>
+    </tr>`;
+  }).join("");
+  const cs=document.getElementById("consensusTxt");
+  cs.textContent=allOk?"✓ Consensus OK":"⚠ Consensus VIOLATED";
+  cs.style.color=allOk?"var(--green)":"var(--red)";
+}
+
+// ── Topology SVG — 3 controllers ──────────────────────────────────────
+function renderTopo(state){
+  const health = {};
+  if(state){
+    Object.entries(state).forEach(([id,c])=>{
+      health[id.toLowerCase()] = c.healthy !== false;
+    });
+  }
+
+  function ctrlCol(id){
+    if(!(id in health)) return "#00e5f5";
+    return health[id] ? "#00e5f5" : "#ff2255";
+  }
+
+  const CTRL = [
+    {id:"ctrl_01", x:55,  y:18, r:13, type:"ctrl"},
+    {id:"ctrl_02", x:155, y:18, r:13, type:"ctrl"},
+    {id:"ctrl_03", x:255, y:18, r:13, type:"ctrl"},
+  ];
+  const SW = [
+    {id:"s1", x:55,  y:68, r:9,  col:"#00e87a", type:"sw"},
+    {id:"s2", x:155, y:68, r:9,  col:"#00e87a", type:"sw"},
+    {id:"s3", x:255, y:68, r:9,  col:"#00e87a", type:"sw"},
+  ];
+  const LEAF = [
+    {id:"s1a",x:22, y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s1b",x:55, y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s1c",x:88, y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s2a",x:122,y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s2b",x:155,y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s2c",x:188,y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s3a",x:222,y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s3b",x:255,y:110,r:7,col:"#00e87a",type:"sw"},
+    {id:"s3c",x:288,y:110,r:7,col:"#00e87a",type:"sw"},
+  ];
+  const HOSTS = [
+    {id:"h1",x:22, y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h2",x:55, y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h3",x:88, y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h4",x:122,y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h5",x:155,y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h6",x:188,y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h7",x:222,y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h8",x:255,y:148,r:5,col:"#273d52",type:"h"},
+    {id:"h9",x:288,y:148,r:5,col:"#273d52",type:"h"},
+  ];
+
+  const LINKS = [
+    ["ctrl_01","s1",true], ["ctrl_02","s2",true], ["ctrl_03","s3",true],
+    ["s1","s1a",true],["s1","s1b",true],["s1","s1c",true],
+    ["s2","s2a",true],["s2","s2b",true],["s2","s2c",true],
+    ["s3","s3a",true],["s3","s3b",true],["s3","s3c",true],
+    ["s1a","h1",false],["s1b","h2",false],["s1c","h3",false],
+    ["s2a","h4",false],["s2b","h5",false],["s2c","h6",false],
+    ["s3a","h7",false],["s3b","h8",false],["s3c","h9",false],
+  ];
+
+  const nm = {};
+  [...CTRL,...SW,...LEAF,...HOSTS].forEach(n=>nm[n.id]=n);
+
+  const lines = LINKS.map(([a,b,trunk])=>{
+    const na=nm[a], nb=nm[b];
+    const ctrlId = CTRL.find(c=>c.id===a)?.id;
+    const stroke = ctrlId ? ctrlCol(ctrlId) : (trunk ? "#00e5f5" : "#1a2d3d");
+    const width  = trunk ? "1.5" : "1";
+    const opacity= trunk ? "0.55" : "0.30";
+    return `<line x1="${na.x}" y1="${na.y}" x2="${nb.x}" y2="${nb.y}"
+      stroke="${stroke}" stroke-width="${width}" opacity="${opacity}"/>`;
+  }).join("");
+
+  const circles = [...CTRL,...SW,...LEAF,...HOSTS].map(n=>{
+    const col = n.type==="ctrl" ? ctrlCol(n.id) : n.col;
+    const glow = n.type==="ctrl" ? `filter="url(#glow)"` : "";
+    let label = n.id;
+    if(n.type==="ctrl") label = "C"+(CTRL.indexOf(n)+1);
+    if(n.type==="h")    label = "";
+    const fontSize = n.type==="ctrl" ? "8" : n.type==="sw" ? "7" : "6";
+    const textY    = n.y + n.r + 9;
+    return `<g>
+      <circle cx="${n.x}" cy="${n.y}" r="${n.r}"
+        fill="${col}18" stroke="${col}" stroke-width="1.2" ${glow}/>
+      ${label?`<text x="${n.x}" y="${textY}" fill="${col}" font-family="Share Tech Mono"
+        font-size="${fontSize}" text-anchor="middle">${label}</text>`:""}
+    </g>`;
+  }).join("");
+
+  const legend = `
+    <rect x="2" y="156" width="100" height="12" fill="rgba(7,11,16,.7)" rx="2"/>
+    <circle cx="9"  cy="162" r="4" fill="#00e5f500" stroke="#00e5f5" stroke-width="1"/>
+    <text x="16" y="165" fill="#00e5f5" font-family="Share Tech Mono" font-size="6">healthy</text>
+    <circle cx="50" cy="162" r="4" fill="#ff225500" stroke="#ff2255" stroke-width="1"/>
+    <text x="57" y="165" fill="#ff2255" font-family="Share Tech Mono" font-size="6">compromised</text>`;
+
+  const svg = document.getElementById("topoSvg");
+  svg.innerHTML=`
+    <defs><filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter></defs>
+    ${lines}${circles}${legend}`;
+}
+renderTopo(null);
+
+// ── Load history on page load ──────────────────────────────────────────
+fetch("/api/alerts").then(r=>r.json()).then(alts=>alts.forEach(a=>io.emit("alert",a)));
+
+setInterval(() => {
+    fetch('/api/state')
+        .then(r => r.json())
+        .then(data => {
+            renderControllers(data);
+        });
+
+    fetch('/api/alerts')
+        .then(r => r.json())
+        .then(data => {
+            renderAlerts(data);
+        });
+
+}, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# configs/default.yaml
+# Override any value by setting environment variable SDN_<KEY>=value
+
+system:
+  log_level: INFO                    # DEBUG | INFO | WARNING | ERROR
+  controller_id: ctrl_01             # Set via CONTROLLER_ID env var
+
+network:
+  openflow_port: 6633                # Ryu listens here
+  dashboard_port: 5000
+  gossip_ports:
+    ctrl_01: 9101
+    ctrl_02: 9102
+    ctrl_03: 9103
+
+security:
+  hash_algorithm: sha3_256
+  key_curve: secp256r1               # NIST P-256
+  replay_window_s: 60
+  consensus_quorum: 0.67             # 2-of-3 minimum
+
+detection:
+  flood_pps_limit: 500               # packets/sec → flood alert
+  flow_rate_limit: 50                # flow rules/sec → injection alert
+  offline_ttl_s: 30                  # no gossip → offline alert
+  anomaly_alpha: 0.1                 # EWMA smoothing factor
+  anomaly_threshold: 3.0             # sigma multiplier (3-sigma rule)
+
+gossip:
+  interval_s: 5.0                    # broadcast period
+  heartbeat_s: 10.0                  # liveness check period
+  max_blocks_memory: 1000            # chain blocks kept in RAM

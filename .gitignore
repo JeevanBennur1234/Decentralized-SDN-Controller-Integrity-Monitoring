@@ -1,0 +1,34 @@
+# ── Secrets ──────────────────────────────────────────────
+# Auto-generated ECDSA key pairs — never commit
+keys/
+.env
+*.pem
+
+# ── Runtime artifacts ───────────────────────────────────
+logs/
+*.log
+*.jsonl
+snapshots/
+state.json
+alerts.json
+
+# ── Python ──────────────────────────────────────────────
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# ── Editors / OS ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
