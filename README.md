@@ -117,7 +117,7 @@ sdn_final/
 ## Installation
 
 ```bash
-git clone https://github.com/JeevanBennur1234/Decentralized-SDN-Controller-Integrity-Monitoring.git
+git clone https://github.com/JeevanBennur1234/Decentralized-SDN-Controller-Integrity-Monitoring.git sdn_final
 cd sdn_final
 bash scripts/setup.sh
 ```
