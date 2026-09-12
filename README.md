@@ -1,7 +1,7 @@
 # Decentralized SDN Controller Integrity Monitoring
 
 ![CI](https://github.com/JeevanBennur1234/Decentralized-SDN-Controller-Integrity-Monitoring/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![Python](https://img.shields.io/badge/python-3.8--3.10-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![OpenFlow](https://img.shields.io/badge/OpenFlow-v1.3-brightgreen)
 
