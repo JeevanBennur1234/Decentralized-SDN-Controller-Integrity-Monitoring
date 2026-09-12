@@ -11,11 +11,11 @@ A distributed SDN security system that monitors the integrity of three Ryu contr
 
 ## Architecture
 
-![Architecture overview](docs/arch1.jpeg)
+![Gossip and consensus flow](docs/arch3.png)
 
 ![Control and data plane](docs/arch2.png)
 
-![Gossip and consensus flow](docs/arch3.png)
+![Architecture overview](docs/arch1.jpeg)
 
 ```
                     CONTROL PLANE
