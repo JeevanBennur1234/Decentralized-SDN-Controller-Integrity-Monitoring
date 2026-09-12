@@ -31,6 +31,9 @@ def run():
     net.addController("c0", controller=RemoteController,
                       ip="127.0.0.1", port=6633)
     net.start()
+    # Force OpenFlow 1.3 on all switches
+    for sw in net.switches:
+        sw.cmd('ovs-vsctl set bridge', sw, 'protocols=OpenFlow13')
     print("\n[Mininet] topology started")
     print("  Try: pingall, net, dump")
     CLI(net)

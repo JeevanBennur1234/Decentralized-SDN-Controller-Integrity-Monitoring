@@ -108,7 +108,7 @@ sdn_final/
 ## Requirements
 
 - Linux (Ubuntu 20.04 or 22.04 recommended)
-- Python 3.8+
+- Python 3.8–3.10 (ryu 4.34 does not support Python 3.11+)
 - Mininet and Open vSwitch installed on the host
 - Ryu does not run on macOS or Windows
 
@@ -142,7 +142,19 @@ This starts:
 - `ctrl_03` on OpenFlow port 6635, gossip port 9103
 - Dashboard on port 5000
 
-Wait until all three controllers print `All subsystems online` in their log files before starting Mininet.
+Wait until all three controllers are ready before starting Mininet:
+
+```bash
+# Each controller logs "All subsystems online" when fully initialised.
+# You can watch all three at once:
+tail -f logs/ctrl_01.log logs/ctrl_02.log logs/ctrl_03.log
+
+# Or check that all three gossip ports are listening:
+ss -tlnH sport = :9101 && ss -tlnH sport = :9102 && ss -tlnH sport = :9103
+```
+
+> `start_multi.sh` polls the gossip ports automatically and only prints
+> "All services ready" once all three controllers are up.
 
 **Terminal 2 — start the Mininet topology:**
 
@@ -212,7 +224,7 @@ curl http://localhost:5000/api/state
 
 ```bash
 source venv/bin/activate
-python -m pytest tests/ -v
+python3 -m pytest tests/ -v
 ```
 
 Tests cover the hash chain, ECDSA signer, integrity agent, and anomaly detector. They do not require Mininet or a running Ryu instance.
@@ -286,7 +298,7 @@ Start the controllers and wait for `All subsystems online` in the logs before ru
 `/tmp/sdn_state.json` has not been written yet. Check that `ryu-manager` started without import errors (`tail logs/ctrl_01.log`).
 
 **`ryu-manager` ImportError**
-Run `pip install ryu` inside the virtualenv. On Python 3.11+ you may need `pip install --pre ryu` or the `ryu-controller` fork.
+Ryu 4.34 requires Python 3.8–3.10. If you are on 3.11 or later, downgrade to Python 3.10 (`pyenv install 3.10` or use the system package `python3.10`).
 
 **Port already in use**
 Run `pkill -f ryu-manager` and `sudo mn -c` to clean up stale processes and OVS state before restarting.

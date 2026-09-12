@@ -1,3 +1,20 @@
+#!/usr/bin/env python3
+"""
+scripts/multi_controller.py
+Mininet topology for the 3-controller setup.
+
+Topology:
+  s1 -- s2 -- s3  (linear chain)
+  h1-h3 on s1, h4-h6 on s2, h7-h9 on s3
+
+Controller assignment:
+  s1: ctrl_01 (6633) primary, ctrl_02 (6634) backup
+  s2: ctrl_02 (6634) primary, ctrl_03 (6635) backup
+  s3: ctrl_03 (6635) primary, ctrl_01 (6633) backup
+
+Run AFTER start_multi.sh:
+  sudo python3 scripts/multi_controller.py
+"""
 from mininet.net import Mininet
 from mininet.node import RemoteController, OVSSwitch
 from mininet.cli import CLI
@@ -83,6 +100,11 @@ def run():
 
     net.build()
 
+    # Force OpenFlow 1.3 on every switch so they negotiate correctly
+    # with the Ryu controllers (which declare OFP_VERSIONS = [ofproto_v1_3]).
+    for sw in [s1, s2, s3]:
+        sw.cmd('ovs-vsctl set bridge', sw, 'protocols=OpenFlow13')
+
     # =========================
     # Assign Controllers
     # =========================
@@ -106,3 +128,4 @@ def run():
 if __name__ == '__main__':
     setLogLevel('info')
     run()
+

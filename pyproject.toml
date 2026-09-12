@@ -7,7 +7,7 @@ name = "sdn-integrity-monitor"
 version = "1.0.0"
 description = "Decentralized SDN controller integrity monitoring with SHA3-256 hash chaining, ECDSA P-256 signatures, and P2P gossip consensus."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.11"
 license = { text = "MIT" }
 authors = [{ name = "Jeevan Bennur" }]
 keywords = ["sdn", "security", "openflow", "ryu", "integrity", "blockchain", "mininet"]
