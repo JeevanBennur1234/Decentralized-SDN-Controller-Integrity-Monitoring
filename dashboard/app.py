@@ -156,7 +156,7 @@ def api_reset():
     # Reset dashboard memory
     _prev_alert_n = 0
     _seen_alert_keys = set()
-    e = _ev("state", "🔄 RECOVERY — all alerts cleared, controllers restored to HEALTHY")
+    e = _ev("state", "RECOVERY: all alerts cleared, controllers restored to HEALTHY")
     sio.emit("event", e)
     sio.emit("clear_alerts", {})
     return jsonify({"ok": True, "message": "All alerts cleared, controllers restored"})
@@ -193,6 +193,6 @@ def index():
                                   ctrls=list(CONTROLLERS.keys()))
 
 if __name__ == "__main__":
-    print(f"\n🔐 SDN Dashboard → http://localhost:{DASHBOARD_PORT}\n")
+    print(f"\nSDN Dashboard -> http://localhost:{DASHBOARD_PORT}\n")
     sio.run(app, host="0.0.0.0", port=DASHBOARD_PORT, allow_unsafe_werkzeug=True,
             debug=False, use_reloader=False)

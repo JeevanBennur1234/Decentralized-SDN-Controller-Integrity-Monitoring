@@ -92,10 +92,10 @@ def run():
     s3.start([c3, c1])
 
     print("\n=== Multi-Controller SDN Started ===")
-    print("s1 -> ctrl_01")
-    print("s2 -> ctrl_02")
-    print("s3 -> ctrl_03")
-    print("9 Hosts Connected")
+    print("s1 -> ctrl_01 (6633), ctrl_02 (6634)")
+    print("s2 -> ctrl_02 (6634), ctrl_03 (6635)")
+    print("s3 -> ctrl_03 (6635), ctrl_01 (6633)")
+    print("9 hosts connected (h1-h9)")
     print("====================================\n")
 
     CLI(net)

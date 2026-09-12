@@ -3,16 +3,14 @@
 cd "$(dirname "$0")/.."
 source venv/bin/activate 2>/dev/null || true
 
-echo "╔══════════════════════════════════════════╗"
-echo "║  SDN Integrity Monitor — Health Check    ║"
-echo "╚══════════════════════════════════════════╝"
+echo "=== SDN Integrity Monitor — Health Check ==="
 
 check() {
   local name="$1" url="$2"
   if curl -sf "$url" > /dev/null 2>&1; then
-    echo "  ✅ $name → $url"
+    echo "  OK   $name -> $url"
   else
-    echo "  ❌ $name → $url (not reachable)"
+    echo "  FAIL $name -> $url (not reachable)"
   fi
 }
 
@@ -27,9 +25,9 @@ echo "State file:"
 [ -f /tmp/sdn_state.json ] && python3 -c "
 import json; s=json.load(open('/tmp/sdn_state.json'))
 for cid,c in s.items():
-    status='✅ HEALTHY' if c.get('healthy') else '❌ COMPROMISED'
+    status='HEALTHY' if c.get('healthy') else 'COMPROMISED'
     print(f'  {cid}: {status} | hash={c.get(\"hash\",\"?\")[:16]}... | pkts={c.get(\"packets\",0)}')
-" || echo "  ❌ /tmp/sdn_state.json not found (controller not running)"
+" || echo "  /tmp/sdn_state.json not found (controller not running)"
 
 echo ""
 echo "Alert count:"

@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/start_multi.sh
-# Starts 3 SDN controllers + dashboard
+# Starts all 3 SDN controllers + dashboard
 
 set -e
 
@@ -8,9 +8,7 @@ cd "$(dirname "$0")/.."
 
 source venv/bin/activate
 
-echo "════════════════════════════════════════════"
-echo " SDN Integrity Monitor — Multi Controller "
-echo "════════════════════════════════════════════"
+echo "=== SDN Integrity Monitor — Multi-Controller ==="
 
 # -------------------------------------------------
 # Cleanup
@@ -37,9 +35,7 @@ mkdir -p logs
 # -------------------------------------------------
 
 echo ""
-echo "[1/4] Starting ctrl_01"
-echo "       OpenFlow : 6633"
-echo "       Gossip   : 9101"
+echo "[1/4] Starting ctrl_01  (OF :6633, gossip :9101)"
 
 CONTROLLER_ID=ctrl_01 \
 ryu-manager \
@@ -48,8 +44,7 @@ controller/ryu_controller.py \
 > logs/ctrl_01.log 2>&1 &
 
 PID1=$!
-
-echo "       PID      : $PID1"
+echo "       PID: $PID1"
 
 sleep 3
 
@@ -58,9 +53,7 @@ sleep 3
 # -------------------------------------------------
 
 echo ""
-echo "[2/4] Starting ctrl_02"
-echo "       OpenFlow : 6634"
-echo "       Gossip   : 9102"
+echo "[2/4] Starting ctrl_02  (OF :6634, gossip :9102)"
 
 CONTROLLER_ID=ctrl_02 \
 ryu-manager \
@@ -69,8 +62,7 @@ controller/ryu_controller.py \
 > logs/ctrl_02.log 2>&1 &
 
 PID2=$!
-
-echo "       PID      : $PID2"
+echo "       PID: $PID2"
 
 sleep 3
 
@@ -79,9 +71,7 @@ sleep 3
 # -------------------------------------------------
 
 echo ""
-echo "[3/4] Starting ctrl_03"
-echo "       OpenFlow : 6635"
-echo "       Gossip   : 9103"
+echo "[3/4] Starting ctrl_03  (OF :6635, gossip :9103)"
 
 CONTROLLER_ID=ctrl_03 \
 ryu-manager \
@@ -90,8 +80,7 @@ controller/ryu_controller.py \
 > logs/ctrl_03.log 2>&1 &
 
 PID3=$!
-
-echo "       PID      : $PID3"
+echo "       PID: $PID3"
 
 sleep 3
 
@@ -106,8 +95,7 @@ python3 dashboard/app.py \
 > logs/dashboard.log 2>&1 &
 
 PID4=$!
-
-echo "       PID      : $PID4"
+echo "       PID: $PID4"
 
 sleep 5
 
@@ -117,49 +105,24 @@ sleep 5
 
 echo ""
 echo "[*] Verifying OpenFlow ports..."
-
 sudo netstat -tulnp | grep 663 || true
 
 echo ""
-echo "════════════════════════════════════════════"
-echo " All services started successfully"
-echo "════════════════════════════════════════════"
-
+echo "=== All services started ==="
 echo ""
-echo "Dashboard:"
-echo "  http://localhost:5000"
-
+echo "Dashboard:  http://localhost:5000"
 echo ""
-echo "OpenFlow Controllers:"
-echo "  ctrl_01 → 6633"
-echo "  ctrl_02 → 6634"
-echo "  ctrl_03 → 6635"
-
+echo "OpenFlow:   ctrl_01 :6633  ctrl_02 :6634  ctrl_03 :6635"
+echo "Gossip:     ctrl_01 :9101  ctrl_02 :9102  ctrl_03 :9103"
 echo ""
-echo "Gossip Ports:"
-echo "  9101, 9102, 9103"
-
+echo "PIDs:  ctrl_01=$PID1  ctrl_02=$PID2  ctrl_03=$PID3  dashboard=$PID4"
 echo ""
-echo "PIDs:"
-echo "  ctrl_01   : $PID1"
-echo "  ctrl_02   : $PID2"
-echo "  ctrl_03   : $PID3"
-echo "  dashboard : $PID4"
-
+echo "Start Mininet in a new terminal:"
+echo "  sudo python3 scripts/multi_controller.py"
 echo ""
-echo "Run Mininet in NEW terminal:"
-echo ""
-echo "sudo mn --topo tree,depth=2,fanout=3 \\"
-echo "  --controller remote,ip=127.0.0.1,port=6633 \\"
-echo "  --switch ovsk,protocols=OpenFlow13"
-
-echo ""
-echo "Attack simulation:"
-echo ""
-echo "source venv/bin/activate"
-echo "python3 attacks/simulator.py all"
-
+echo "Attack simulation (new terminal):"
+echo "  source venv/bin/activate"
+echo "  python3 attacks/simulator.py ctrl_01"
 echo ""
 echo "Watch logs:"
-echo ""
-echo "tail -f logs/ctrl_01.log"
+echo "  tail -f logs/ctrl_01.log logs/ctrl_02.log logs/ctrl_03.log"

@@ -1,4 +1,5 @@
 # configs/prometheus.yml
+# All SDN metrics are exposed by the dashboard at /metrics.
 # Run Prometheus with: prometheus --config.file=configs/prometheus.yml
 
 global:
@@ -10,15 +11,3 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:5000"]
     metrics_path: /metrics
-
-  - job_name: sdn_ctrl_01
-    static_configs:
-      - targets: ["localhost:8001"]
-
-  - job_name: sdn_ctrl_02
-    static_configs:
-      - targets: ["localhost:8002"]
-
-  - job_name: sdn_ctrl_03
-    static_configs:
-      - targets: ["localhost:8003"]

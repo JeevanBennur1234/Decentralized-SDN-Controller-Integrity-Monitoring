@@ -1,19 +1,9 @@
 version: "3.8"
 
-services:
-  dashboard:
-    build: .
-    container_name: sdn_dashboard
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./keys:/app/keys
-      - ./logs:/app/logs
-      - /tmp/sdn_state.json:/tmp/sdn_state.json
-      - /tmp/sdn_alerts.json:/tmp/sdn_alerts.json
-    command: python3 dashboard/app.py
-    restart: unless-stopped
+# Note: network_mode: host is required for controllers so that Mininet
+# (running on the host) can reach the OpenFlow ports. This only works on Linux.
 
+services:
   ctrl_01:
     build: .
     container_name: sdn_ctrl_01
@@ -23,10 +13,47 @@ services:
     volumes:
       - ./keys:/app/keys
       - ./logs:/app/logs
-    command: >
-      sh -c "ryu-manager controller/ryu_controller.py --verbose"
+      - sdn_tmp:/tmp
+    command: ryu-manager --ofp-tcp-listen-port 6633 controller/ryu_controller.py
+
+  ctrl_02:
+    build: .
+    container_name: sdn_ctrl_02
+    network_mode: host
+    environment:
+      - CONTROLLER_ID=ctrl_02
+    volumes:
+      - ./keys:/app/keys
+      - ./logs:/app/logs
+      - sdn_tmp:/tmp
+    command: ryu-manager --ofp-tcp-listen-port 6634 controller/ryu_controller.py
+
+  ctrl_03:
+    build: .
+    container_name: sdn_ctrl_03
+    network_mode: host
+    environment:
+      - CONTROLLER_ID=ctrl_03
+    volumes:
+      - ./keys:/app/keys
+      - ./logs:/app/logs
+      - sdn_tmp:/tmp
+    command: ryu-manager --ofp-tcp-listen-port 6635 controller/ryu_controller.py
+
+  dashboard:
+    build: .
+    container_name: sdn_dashboard
+    network_mode: host
+    volumes:
+      - ./keys:/app/keys
+      - ./logs:/app/logs
+      - sdn_tmp:/tmp
+    command: python3 dashboard/app.py
+    restart: unless-stopped
     depends_on:
-      - dashboard
+      - ctrl_01
+      - ctrl_02
+      - ctrl_03
 
   prometheus:
     image: prom/prometheus:latest
@@ -48,3 +75,6 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=sdn2026
     depends_on:
       - prometheus
+
+volumes:
+  sdn_tmp:

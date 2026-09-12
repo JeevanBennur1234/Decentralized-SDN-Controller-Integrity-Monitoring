@@ -3,11 +3,11 @@ attacks/simulator.py — Targeted SDN attack simulation framework.
 
 Usage:
 
-python3 attacks/simulator.py ctrl_01
-python3 attacks/simulator.py ctrl_02
-python3 attacks/simulator.py ctrl_03
-
-python3 attacks/simulator.py reset
+  python3 attacks/simulator.py ctrl_01
+  python3 attacks/simulator.py ctrl_02
+  python3 attacks/simulator.py ctrl_03
+  python3 attacks/simulator.py all
+  python3 attacks/simulator.py reset
 """
 
 import json
@@ -134,6 +134,10 @@ def compromise_controller(target):
     print(f"    Target : {target}")
     print(f"    Old Hash: {s[target]['hash'][:20]}...")
 
+    # Save original values before corruption
+    original_hash = s[target]["hash"]
+    original_sig  = s[target]["sig"]
+
     # Compromise ONLY target controller
     s[target]["hash"] = fake_hash
     s[target]["healthy"] = False
@@ -148,10 +152,6 @@ def compromise_controller(target):
     )
 
     s[target]["sig"] = fake_sig
-
-    # Save original values before corruption
-    original_hash = s[target]["hash"]
-    original_sig = s[target]["sig"]
     
     # Apply attack
     _save(s)
@@ -180,11 +180,9 @@ def compromise_controller(target):
 
         _save(s)
 
-        print(f"\n[✓] {target} automatically restored")
+        print(f"\n[+] {target} restored to HEALTHY")
 
-    print(f"\n[✓] {target} marked COMPROMISED")
-    print("\nDashboard:")
-    print("   http://localhost:5000")
+    print("\nDashboard: http://localhost:5000")
 
 
 # ─────────────────────────────────────────────
@@ -248,6 +246,7 @@ if __name__ == "__main__":
         print("   python3 attacks/simulator.py ctrl_01")
         print("   python3 attacks/simulator.py ctrl_02")
         print("   python3 attacks/simulator.py ctrl_03")
+        print("   python3 attacks/simulator.py all")
         print("   python3 attacks/simulator.py reset\n")
 
         sys.exit(1)
@@ -257,10 +256,15 @@ if __name__ == "__main__":
     if cmd == "reset":
         reset()
 
+    elif cmd == "all":
+        for target in ["ctrl_01", "ctrl_02", "ctrl_03"]:
+            compromise_controller(target)
+
     elif cmd in ["ctrl_01", "ctrl_02", "ctrl_03"]:
         compromise_controller(cmd)
 
     else:
-        print(f"\n[ERROR] Invalid controller: {cmd}")
+        print(f"\n[ERROR] Unknown argument: {cmd}")
+        print("Valid: ctrl_01 | ctrl_02 | ctrl_03 | all | reset")
 
     print("\n========================================")

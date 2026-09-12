@@ -1,281 +1,305 @@
-# 🔐 Decentralized SDN Controller Integrity Monitoring
-
-**KLE Technological University · Department of CSE · VI Semester Minor Project 2026**
+# Decentralized SDN Controller Integrity Monitoring
 
 ![CI](https://github.com/JeevanBennur1234/Decentralized-SDN-Controller-Integrity-Monitoring/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![OpenFlow](https://img.shields.io/badge/OpenFlow-v1.3-brightgreen)
 
-A production-grade, distributed SDN security platform that monitors the integrity
-of Software-Defined Network controllers in real time using cryptographic hash
-chaining, ECDSA digital signatures, and a peer-to-peer gossip consensus protocol.
-
-> **TL;DR** — Every SDN controller keeps a tamper-evident SHA3-256 hash chain of
-> its own state, signs it with an ECDSA P-256 key, and broadcasts it to peer
-> controllers. Peers verify signatures and freshness, score each other's trust,
-> and detect 8 classes of attacks — all without any centralized coordinator.
+A distributed SDN security system that monitors the integrity of three Ryu controllers in real time. Each controller maintains a SHA3-256 hash chain of its own state, signs each block with an ECDSA P-256 key, and broadcasts it to the other two controllers via a push-gossip protocol. Peers verify signatures, track freshness, and run a 2-of-3 majority consensus with no central coordinator.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   DECENTRALIZED CONTROL PLANE                │
-│                                                             │
-│  ┌──────────────┐  gossip  ┌──────────────┐  gossip        │
-│  │   ctrl_01    │◄────────►│   ctrl_02    │◄──────┐        │
-│  │  Ryu + Agent │          │  Ryu + Agent │       │        │
-│  │  port 6633   │          │  port 6634   │       │        │
-│  └──────┬───────┘          └──────┬───────┘       │        │
-│         │ gossip                  │            ┌───┴──────┐ │
-│         └────────────────────────┼───────────►│  ctrl_03 │ │
-│                                  │            │  port    │ │
-│  Writes /tmp/sdn_state.json      │            │  6635    │ │
-│         │                        │            └──────────┘ │
-└─────────┼────────────────────────┼─────────────────────────┘
-          │                        │
-          ▼                        ▼
-    OpenFlow 1.3            OpenFlow 1.3
-   ┌──────────────────────────────────────┐
-   │     Mininet: s1 → s2,s3,s4 → h1-h9 │
-   └──────────────────────────────────────┘
-          │
-          ▼
-   Flask Dashboard (port 5000)
-   WebSocket (Socket.IO) → browser
+                    CONTROL PLANE
+
+  ctrl_01 (OF :6633, gossip :9101)
+  ctrl_02 (OF :6634, gossip :9102)
+  ctrl_03 (OF :6635, gossip :9103)
+
+  Each controller gossips its signed state to the other two every 5 s.
+  All three write to /tmp/sdn_state.json (atomic replace).
+  The dashboard reads that file and pushes updates to the browser over WebSocket.
+
+                    DATA PLANE (Mininet)
+
+  h1 h2 h3          h4 h5 h6          h7 h8 h9
+     |                  |                  |
+     s1 -------------- s2 -------------- s3
+
+  s1: ctrl_01 (primary), ctrl_02 (backup)
+  s2: ctrl_02 (primary), ctrl_03 (backup)
+  s3: ctrl_03 (primary), ctrl_01 (backup)
+
+  Linear chain s1 -- s2 -- s3, 9 hosts total (h1-h9).
+  Every switch is registered with two controllers for redundancy.
 ```
 
-### Key algorithms
+### Core components
 
-| Algorithm | Where used | Purpose |
-|-----------|-----------|---------|
-| SHA3-256 chain | `integrity/chain.py` | Tamper-evident state history |
-| ECDSA P-256 | `integrity/signer.py` | Authenticate each state block |
-| Push gossip | `gossip/node.py` | Broadcast state to all peers |
-| Majority vote | `integrity/agent.py` | 2-of-3 consensus |
-| EWMA 3-sigma | `monitoring/anomaly.py` | Statistical flood/poisoning detection |
-| Replay detection | `integrity/agent.py` | Block stale/rollback messages |
+| Module | Purpose |
+|--------|---------|
+| `integrity/chain.py` | SHA3-256 chained block structure |
+| `integrity/signer.py` | ECDSA P-256 key management, sign, verify |
+| `integrity/agent.py` | Hash, sign, alert, consensus engine |
+| `gossip/node.py` | Push-gossip client and heartbeat TTL |
+| `gossip/server.py` | HTTP server for receiving peer state |
+| `monitoring/anomaly.py` | EWMA 3-sigma flood and injection detection |
+| `monitoring/audit.py` | Signed append-only audit log |
+| `dashboard/app.py` | Flask + Socket.IO real-time dashboard |
+| `attacks/simulator.py` | Attack simulation (hash tamper, sig forgery) |
 
 ---
 
-## File Structure
+## Project Structure
 
 ```
 sdn_final/
 ├── controller/
-│   └── ryu_controller.py    L2 switch + integrity + gossip entry point
+│   └── ryu_controller.py    L2 MAC-learning switch with integrity agent and gossip
 ├── integrity/
-│   ├── agent.py             Core monitoring engine (hash, sign, alert, consensus)
+│   ├── agent.py             Core engine: hash, sign, alert, consensus
 │   ├── chain.py             SHA3-256 chained block structure
 │   └── signer.py            ECDSA P-256 key management
 ├── gossip/
-│   ├── node.py              P2P push-gossip + heartbeat TTL
+│   ├── node.py              Push-gossip client + heartbeat TTL
 │   └── server.py            HTTP server for receiving peer state
 ├── dashboard/
 │   ├── app.py               Flask + Socket.IO backend
-│   └── ui.html              Dark dashboard (WebSocket client)
+│   └── ui.html              Real-time browser dashboard
 ├── monitoring/
 │   ├── anomaly.py           EWMA statistical anomaly detection
-│   └── audit.py             Immutable signed audit log (tamper-evident)
+│   ├── audit.py             Signed append-only audit log
+│   └── prometheus.py        Prometheus metric definitions
 ├── attacks/
-│   └── simulator.py         8-scenario attack simulation framework
+│   └── simulator.py         Attack simulation (hash tamper, sig forgery, etc.)
 ├── shared/
-│   ├── config.py            Central configuration (ports, paths, thresholds)
+│   ├── config.py            Ports, paths, thresholds
 │   ├── events.py            Event type constants
 │   └── logger.py            Structured logging
 ├── scripts/
-│   ├── setup.sh             One-time install: venv + pip + keys
-│   ├── start.sh             Launch single controller + dashboard
-│   ├── start_multi.sh       Launch 3 controllers + dashboard
-│   ├── verify.sh            Health-check all services
-│   ├── mininet_topo.py      Custom Mininet topology
-│   └── multi_controller.py  Mininet with 3 remote controllers
-├── tests/                   Pytest unit + integration suite (38 tests)
+│   ├── setup.sh             One-time install: venv, pip, keys
+│   ├── start_multi.sh       Three-controller mode + dashboard
+│   ├── start.sh             Single-controller mode (ctrl_01 only)
+│   ├── verify.sh            Health-check all running services
+│   ├── multi_controller.py  Mininet topology for 3-controller mode
+│   └── mininet_topo.py      Alternative single-controller Mininet topology
+├── tests/                   Pytest unit tests
 ├── configs/
 │   ├── prometheus.yml       Prometheus scrape config
-│   └── default.yaml         YAML mirror of shared/config.py
-├── keys/                    Auto-generated ECDSA .pem files (git-ignored)
-├── logs/                    Runtime logs + audit.jsonl + snapshots/ (git-ignored)
+│   └── default.yaml         Configuration reference
+├── keys/                    ECDSA .pem files (auto-generated, git-ignored)
+├── logs/                    Runtime logs and audit.jsonl (git-ignored)
 ├── Dockerfile
-├── docker-compose.yml       Dashboard + controllers + Prometheus + Grafana
-├── pyproject.toml           Package metadata + pytest configuration
+├── docker-compose.yml       All 3 controllers + dashboard + Prometheus + Grafana
+├── pyproject.toml
 └── requirements.txt
 ```
 
 ---
 
-## Quick Start
+## Requirements
 
-These instructions assume a **Linux** host (Ubuntu 20.04/22.04 recommended) with
-Python 3.8+, since Mininet and Ryu require it.
+- Linux (Ubuntu 20.04 or 22.04 recommended)
+- Python 3.8+
+- Mininet and Open vSwitch installed on the host
+- Ryu does not run on macOS or Windows
 
-### 1. Setup (once)
+---
+
+## Installation
 
 ```bash
+git clone https://github.com/JeevanBennur1234/Decentralized-SDN-Controller-Integrity-Monitoring.git
 cd sdn_final
 bash scripts/setup.sh
 ```
 
-### 2. Run tests (optional but recommended)
+`setup.sh` creates a virtualenv, installs all Python dependencies, and generates ECDSA key pairs for all three controllers under `keys/`.
+
+---
+
+## Running
+
+### Three-controller mode (recommended)
+
+**Terminal 1 — start controllers and dashboard:**
+
+```bash
+bash scripts/start_multi.sh
+```
+
+This starts:
+- `ctrl_01` on OpenFlow port 6633, gossip port 9101
+- `ctrl_02` on OpenFlow port 6634, gossip port 9102
+- `ctrl_03` on OpenFlow port 6635, gossip port 9103
+- Dashboard on port 5000
+
+Wait until all three controllers print `All subsystems online` in their log files before starting Mininet.
+
+**Terminal 2 — start the Mininet topology:**
+
+```bash
+sudo python3 scripts/multi_controller.py
+```
+
+This creates a linear chain `s1 -- s2 -- s3` with 9 hosts. Each switch connects to two controllers:
+
+- `s1`: ctrl_01 (6633), ctrl_02 (6634)
+- `s2`: ctrl_02 (6634), ctrl_03 (6635)
+- `s3`: ctrl_03 (6635), ctrl_01 (6633)
+
+Inside the Mininet CLI:
+
+```
+mininet> pingall
+mininet> net
+mininet> dump
+```
+
+### Single-controller mode
+
+Starts only `ctrl_01` and the dashboard. Useful for testing without Mininet's multi-controller support.
+
+```bash
+bash scripts/start.sh
+```
+
+Then in a new terminal:
+
+```bash
+sudo mn --topo tree,depth=2,fanout=3 \
+        --controller remote,ip=127.0.0.1,port=6633 \
+        --switch ovsk,protocols=OpenFlow13
+```
+
+---
+
+## Verification
+
+```bash
+bash scripts/verify.sh
+```
+
+Checks HTTP reachability of the dashboard, Prometheus endpoint, and all three gossip servers. Also prints the current state of `/tmp/sdn_state.json` and recent alerts.
+
+### Manual checks
+
+```bash
+# Controller logs
+tail -f logs/ctrl_01.log logs/ctrl_02.log logs/ctrl_03.log
+
+# Gossip ping
+curl http://localhost:9101/gossip/ping
+curl http://localhost:9102/gossip/ping
+curl http://localhost:9103/gossip/ping
+
+# Dashboard API
+curl http://localhost:5000/api/status
+curl http://localhost:5000/api/state
+```
+
+---
+
+## Tests
 
 ```bash
 source venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-### 3. Start everything — single controller
+Tests cover the hash chain, ECDSA signer, integrity agent, and anomaly detector. They do not require Mininet or a running Ryu instance.
 
-```bash
-bash scripts/start.sh
-```
+---
 
-This launches `ctrl_01` (OpenFlow :6633, gossip :9101) and the dashboard
-(http://localhost:5000) in the background.
+## Attack Simulation
 
-### 4. Start a Mininet topology (new terminal)
-
-```bash
-sudo mn --topo tree,depth=2,fanout=3 \
-        --controller remote,ip=127.0.0.1,port=6633 \
-        --switch ovsk,protocols=OpenFlow13
-# inside Mininet CLI:
-mininet> pingall
-mininet> net
-```
-
-### 5. Simulate attacks (new terminal)
+The simulator manipulates `/tmp/sdn_state.json` and `/tmp/sdn_alerts.json` directly to demonstrate detection scenarios. The dashboard must be running.
 
 ```bash
 source venv/bin/activate
-python3 attacks/simulator.py all    # run all 8 attacks
-python3 attacks/simulator.py 1      # a specific attack
-python3 attacks/simulator.py reset  # clear alerts
+
+# Target a specific controller
+python3 attacks/simulator.py ctrl_01
+python3 attacks/simulator.py ctrl_02
+python3 attacks/simulator.py ctrl_03
+
+# Target all three in sequence
+python3 attacks/simulator.py all
+
+# Clear all alerts and restore healthy state
+python3 attacks/simulator.py reset
 ```
 
-### Multi-controller mode (3 controllers)
+Each run corrupts the target controller's hash and signature for 10 seconds, then automatically restores it. The dashboard shows the `HASH_MISMATCH` and `SIG_INVALID` alerts in real time.
 
-```bash
-bash scripts/start_multi.sh          # ctrl_01/02/03 + dashboard
-```
+### Detection mechanisms
 
-Each controller runs its own gossip server on ports 9101/9102/9103 and gossips
-its signed state every 5 seconds; consensus runs on every peer state received.
+| Attack | How it is detected |
+|--------|--------------------|
+| Hash tampering | Local `chain.verify_all()` fails |
+| Signature forgery | `verify()` returns False on invalid DER bytes |
+| Flow injection | Flow rule rate > 50/s triggers FLOW_INJECT alert |
+| Replay / rollback | Block index regression or stale timestamp rejected |
+| Controller offline | No gossip heartbeat for > 30 s |
+| Packet flood | Packet rate > 500 pps triggers FLOOD alert |
 
-### Verify everything is healthy
+---
 
-```bash
-bash scripts/verify.sh
-```
+## Dashboard
 
-### Docker deployment
+Open `http://localhost:5000` after starting the services.
+
+- Controller table: health status, chain head hash, block height, trust score
+- Alert list: type, severity, source, detail, timestamp
+- Event stream: switch connect, packet-in, flow-add, gossip events
+- Packet rate chart: rolling 2-minute history
+- Prometheus metrics: `http://localhost:5000/metrics`
+
+---
+
+## Docker Deployment
 
 ```bash
 docker compose up --build
-# Dashboard :5000 · Prometheus :9090 · Grafana :3000
 ```
 
----
+Starts all three controllers, the dashboard, Prometheus (:9090), and Grafana (:3000). Grafana default credentials: `admin` / `sdn2026`.
 
-## Attack Scenarios
-
-| # | Attack | Detection mechanism |
-|---|--------|---------------------|
-| 1 | Hash Tampering | Local blockchain `verify_all()` fails |
-| 2 | ECDSA Signature Forgery | `verify()` returns False (invalid DER) |
-| 3 | Malicious Flow Injection | Abnormal flow rate > 50/s detected |
-| 4 | Replay Attack | Rollback / stale block index rejected |
-| 5 | Controller Offline | No gossip heartbeat for >30s |
-| 6 | Packet Flood DoS | Packet rate > 500 pps on any switch |
-| 7 | Fake/Rogue Controller | Unknown controller_id / invalid signature |
-| 8 | Unauthorized Switch | DPID not in authorised topology |
-
----
-
-## Dashboard Features
-
-- **WebSocket live updates** — no page refresh ever needed
-- **Controller table** — health, chain hash (head), block index, trust state
-- **Real-time alert list** — severity, type, source, detail, timestamp
-- **Live event stream** — every switch connect, packet, flow, gossip event
-- **Trust score bars** — per-controller peer trust (0–100%), decays on violation
-- **Topology SVG** — live tree topology with active link highlighting
-- **Prometheus** — `/metrics` endpoint for Grafana integration
-
----
-
-## Viva / Presentation Points
-
-### Innovation
-
-1. **SHA3-256 chained blocks** — not just hashing state, but chaining blocks so
-   any past tampering is retroactively detectable.
-2. **Per-controller ECDSA keys** — each controller cryptographically proves its
-   identity; no centralised trust authority needed.
-3. **Push gossip with consensus** — controllers cross-verify each other without
-   any coordination server — true decentralisation.
-4. **8-vector attack simulator** — demonstrates all OWASP-style SDN attack
-   categories with a single command.
-
-### Algorithm explanation (for viva)
-
-> *"Our hash chain works like a mini blockchain: each block's hash depends on
-> both the current state AND the previous block's hash. If an attacker changes
-> block 5, block 5's hash changes, which changes block 6's hash, which changes
-> block 7's hash — the tamper propagates and becomes visible at the chain head.
-> Peers who independently compute the same state get the same hash; a mismatch
-> triggers a HASH_MISMATCH consensus failure."*
-
-### Limitations (be honest — professors respect this)
-
-- Gossip uses HTTP, not mTLS — production would use gRPC with mutual TLS.
-- Consensus is 2-of-3 majority; Raft or PBFT would be stronger for N>3.
-- No automatic remediation — alerts are detected but not acted upon.
-- Single-machine demo; real deployment needs Docker Swarm or Kubernetes.
-
-### Future enhancements
-
-- Raft consensus protocol replacing simple majority vote
-- Lightweight blockchain anchoring state hashes to Ethereum (every 1000 blocks)
-- ML-based anomaly detection (LSTM on packet rate time series)
-- RBAC dashboard login with JWT
-- mTLS for gossip channel (prevent MITM on controller network)
+`network_mode: host` is required for the controllers so that Mininet (running on the host) can reach the OpenFlow ports. This only works on Linux.
 
 ---
 
 ## Troubleshooting
 
-**Mininet "Unable to contact remote controller"**
-→ Start Ryu BEFORE running Mininet. Wait for "All subsystems online".
+**"Unable to contact remote controller" in Mininet**
+Start the controllers and wait for `All subsystems online` in the logs before running `multi_controller.py`.
 
-**Dashboard shows blank table**
-→ State file not yet written. Check `ryu-manager` is running without error.
+**Dashboard shows an empty table**
+`/tmp/sdn_state.json` has not been written yet. Check that `ryu-manager` started without import errors (`tail logs/ctrl_01.log`).
 
 **`ryu-manager` ImportError**
-→ `pip install ryu` inside venv. Some systems need `pip install --pre ryu`.
+Run `pip install ryu` inside the virtualenv. On Python 3.11+ you may need `pip install --pre ryu` or the `ryu-controller` fork.
 
-**Gossip servers conflict on same port**
-→ 3 controllers on one machine must use ports 9101, 9102, 9103.
-  Check `shared/config.py` CONTROLLERS dict.
+**Port already in use**
+Run `pkill -f ryu-manager` and `sudo mn -c` to clean up stale processes and OVS state before restarting.
 
-**`flask-socketio` WebSocket fails**
-→ `pip install eventlet` — Socket.IO needs an async worker.
+**`flask-socketio` WebSocket errors**
+Install `eventlet`: `pip install eventlet`. Socket.IO requires an async worker.
 
 ---
 
-## Contributing
+## Limitations
 
-Fork the repo, make your change, and open a pull request. Please keep the
-existing code style, add/adjust tests for any logic you touch, and make sure
-`python -m pytest tests/` passes locally before submitting.
+- Gossip transport is plain HTTP. A production deployment would use mutual TLS to prevent eavesdropping and MITM on the controller network.
+- Consensus is a simple 2-of-3 majority vote. Raft or PBFT would provide stronger guarantees for larger or adversarial deployments.
+- No automated remediation: alerts are detected and logged but the system does not take corrective action (e.g. isolating a compromised controller).
+- The attack simulator manipulates state files directly; it does not inject real OpenFlow messages or network traffic.
+- Tested on a single machine. Multi-host deployment requires adjusting IP addresses in `shared/config.py`.
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-*Built with Ryu, Mininet, Flask-SocketIO, and way too much coffee. ☕*
+[MIT License](LICENSE)

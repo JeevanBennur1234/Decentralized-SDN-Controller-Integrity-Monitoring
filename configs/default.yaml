@@ -1,5 +1,7 @@
 # configs/default.yaml
-# Override any value by setting environment variable SDN_<KEY>=value
+# Reference configuration — documents all tuneable parameters and their defaults.
+# This file is NOT loaded at runtime; actual values are set in shared/config.py
+# and can be overridden via environment variables where noted.
 
 system:
   log_level: INFO                    # DEBUG | INFO | WARNING | ERROR

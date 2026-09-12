@@ -31,5 +31,4 @@ flood_events = Counter("sdn_flood_events",    "Flood events detected",    ["ctrl
 
 # ── System info ────────────────────────────────────────────────────────
 sdn_info     = Info("sdn_system", "SDN Integrity Monitor build info")
-sdn_info.info({"version": "2.0", "crypto": "ECDSA-P256", "hash": "SHA3-256",
-               "project": "KLE Tech VI Sem CSE Minor 2026"})
+sdn_info.info({"version": "1.0", "crypto": "ECDSA-P256", "hash": "SHA3-256"})

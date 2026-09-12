@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
 scripts/mininet_topo.py
-Custom Mininet topology for multi-controller setup.
+Alternative single-controller Mininet topology (tree, depth=2, fanout=3).
+Connects to ctrl_01 only on port 6633.
+
+For the full 3-controller topology use scripts/multi_controller.py instead.
 Run:  sudo python3 scripts/mininet_topo.py
 """
 from mininet.net  import Mininet
